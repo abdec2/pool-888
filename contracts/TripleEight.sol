@@ -9,18 +9,19 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 
-contract MercuryChips is ERC20, ERC20Burnable, ERC20Snapshot, AccessControl, Pausable, ERC20Permit, ERC20Votes {
+contract TripleEight is ERC20, ERC20Burnable, ERC20Snapshot, AccessControl, Pausable, ERC20Permit, ERC20Votes {
     bytes32 public constant SNAPSHOT_ROLE = keccak256("SNAPSHOT_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    bytes32 public constant EXTENDER_ROLE = keccak256("EXTENDER_ROLE");
 
-    uint256 public ApprovedSupply = 50000000 * 10 ** (decimals()) ; 
+    uint256 public ApprovedSupply = 888 * 10 ** (decimals()) ; 
 
-    constructor() ERC20("Mercury Chips", "MCHIP") ERC20Permit("Mercury Chips") {
+    constructor() ERC20("888", "888") ERC20Permit("Mercury Chip") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(SNAPSHOT_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
-        _mint(msg.sender, 10000000 * 10 ** decimals());
+        _mint(msg.sender, 178 * 10 ** decimals());
         _grantRole(MINTER_ROLE, msg.sender);
     }
 
@@ -42,6 +43,11 @@ contract MercuryChips is ERC20, ERC20Burnable, ERC20Snapshot, AccessControl, Pau
 
     function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
         _mint(to, amount);
+    }
+
+    function IncreaseApprovedSupply(uint256 _newApprovedSupply) public onlyRole(EXTENDER_ROLE) {
+        require(_newApprovedSupply > ApprovedSupply, "MCHIP CONTRACT: Invalid Supply");
+        ApprovedSupply = _newApprovedSupply;
     }
 
     function _beforeTokenTransfer(address from, address to, uint256 amount)
