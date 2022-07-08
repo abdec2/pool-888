@@ -432,31 +432,45 @@ pragma solidity ^0.8.0;
 contract Staking is Ownable {
     using SafeMath for uint256;
 
-    uint8 public APR = 5;
-
     IERC20 public rewardToken;
 
-    address[] internal stakeholders;
-    address[] public allowedTokens;
+    struct token {
+        address tokenAddress;
+        string tokenName;
+        string tokenSymbol;
+        uint256 depositFee;
+        uint256 harvestLockup;
+        uint256 apr;
+    }
 
-    mapping(address => mapping(address => uint256)) public stakingBalance;
+    struct stake {
+        uint256 amount;
+        token stakeToken;
+        uint timestamp;
+    }
+
+    address[] internal stakeholders;
+    token[] public allowedTokens;
+
+    // mapping of user address to mapping of token address to stake
+    mapping(address => mapping(address => stake)) public stakes; 
 
     constructor(address _rewardToken)
     { 
         rewardToken = IERC20(_rewardToken);
     }
 
-    function addAllowedTokens(address token) public onlyOwner {
-        allowedTokens.push(token);
+    function addAllowedTokens(token _token) public onlyOwner {
+        allowedTokens.push(_token);
     }
 
-    function tokenIsAllowed(address token) public returns (bool) {
+    function tokenIsAllowed(address _token) public returns (bool) {
         for (
             uint256 allowedTokensIndex = 0;
             allowedTokensIndex < allowedTokens.length;
             allowedTokensIndex++
         ) {
-            if (allowedTokens[allowedTokensIndex] == token) {
+            if (allowedTokens[allowedTokensIndex].tokenAddress == _token) {
                 return true;
             }
         }
@@ -470,64 +484,55 @@ contract Staking is Ownable {
         require(tokenIsAllowed(token), "Token currently isn't allowed");
         require(IERC20(token).transferFrom(msg.sender, address(this), _amount), "Token Transfer Failed");
 
-        if(stakingBalance[msg.sender][_token] == 0) {
+        if(stakes[msg.sender][_token].amount == 0) {
             addStakeholder(msg.sender);
-            stakingBalance[msg.sender][_token] = stakingBalance[msg.sender][_token] + _amount;
-            totalStake = totalStake.add(_stake);
+            stakes[msg.sender][_token].amount = stakes[msg.sender][_token].amount + _amount;
         } else {
-            stake memory tempStake = stakes[msg.sender][_stakePeriod];
-            tempStake.amount = tempStake.amount.add(_stake);
-            stakes[msg.sender][_stakePeriod] = tempStake;
-            totalStake = totalStake.add(_stake);
+            stake memory tempStake = stakes[msg.sender][_token];
+            tempStake.amount = tempStake.amount.add(_amount);
+            stakes[msg.sender][_token] = tempStake;
         }
     }
 
-    function unStake(uint256 _stake, StakingPeriod _stakePeriod) public {
-        require(_stake > 0, "stake value should not be zero");
-        stake memory tempStake = stakes[msg.sender][_stakePeriod];
-        require(validateStakingPeriod(tempStake), "Staking period is not expired");
-        require(_stake <= tempStake.amount, "Invalid Stake Amount");
-        uint256 _investorReward = getDailyRewards(_stakePeriod);
-        tempStake.amount = tempStake.amount.sub(_stake);
-        stakes[msg.sender][_stakePeriod] = tempStake;
-        totalStake = totalStake.sub(_stake);
-        totalRewards = totalRewards.add(_investorReward);
-        //uint256 tokensToBeTransfer = _stake.add(_investorReward);
-        if(stakes[msg.sender][_stakePeriod].amount == 0) removeStakeholder(msg.sender);
-        myToken.transfer(msg.sender, _stake);
-        myToken.transferFrom(owner(), msg.sender, _investorReward);
+    function unStake(uint256 _amount, address _token) public {
+        require(_amount > 0, "stake value should not be zero");
+        stake memory tempStake = stakes[msg.sender][_token];
+        require(_amount <= tempStake.amount, "Invalid Stake Amount");
+        tempStake.amount = tempStake.amount.sub(_amount);
+        stakes[msg.sender][_token] = tempStake;
+        if(stakes[msg.sender][_token].amount == 0) removeStakeholder(msg.sender);
+        IERC20(_token).transfer(msg.sender, _amount);        
+    }
+
+    function harvest(address _token) public {
         
     }
 
-    function getInvestorRewards(uint256 _unstakeAmount, stake memory _investor) internal view returns (uint256) {
-        uint256 investorStakingPeriod = getStakingPeriodInNumbers(_investor);
-        uint APY = investorStakingPeriod == 26 weeks ? sixMonthAPR : investorStakingPeriod == 52 weeks ? oneYearAPR : investorStakingPeriod == 156 weeks ? threeYearAPR : 0;
-        return _unstakeAmount.div(100).mul(APY);
-    } 
+    // function getInvestorRewards(uint256 _unstakeAmount, stake memory _investor) internal view returns (uint256) {
+    //     uint256 investorStakingPeriod = getStakingPeriodInNumbers(_investor);
+    //     uint APY = investorStakingPeriod == 26 weeks ? sixMonthAPR : investorStakingPeriod == 52 weeks ? oneYearAPR : investorStakingPeriod == 156 weeks ? threeYearAPR : 0;
+    //     return _unstakeAmount.div(100).mul(APY);
+    // } 
 
-    function validateStakingPeriod(stake memory _investor) internal view returns(bool) {
-        uint256 stakingTimeStamp = _investor.timestamp + getStakingPeriodInNumbers(_investor);
-        return true; // change it to block.timestamp >= stakingTimeStamp; while deploying
-    } 
+    // function validateStakingPeriod(stake memory _investor) internal view returns(bool) {
+    //     uint256 stakingTimeStamp = _investor.timestamp + getStakingPeriodInNumbers(_investor);
+    //     return true; // change it to block.timestamp >= stakingTimeStamp; while deploying
+    // } 
 
-    function getStakingPeriodInNumbers(stake memory _investor) internal pure returns (uint256){
-        return _investor.stakePeriod == StakingPeriod.SIX_MONTH ? 26 weeks : _investor.stakePeriod == StakingPeriod.ONE_YEAR ? 52 weeks : _investor.stakePeriod == StakingPeriod.THREE_YEAR ? 156 weeks : 0; 
-    }
+    // function getStakingPeriodInNumbers(stake memory _investor) internal pure returns (uint256){
+    //     return _investor.stakePeriod == StakingPeriod.SIX_MONTH ? 26 weeks : _investor.stakePeriod == StakingPeriod.ONE_YEAR ? 52 weeks : _investor.stakePeriod == StakingPeriod.THREE_YEAR ? 156 weeks : 0; 
+    // }
 
-    function stakeOf(address _stakeholder, StakingPeriod _stakePeriod)
+    function stakeOf(address _stakeholder, address _token)
         public
         view
         returns(uint256)
     {
-        return stakes[_stakeholder][_stakePeriod].amount;
+        return stakes[_stakeholder][_token].amount;
     }
 
-    function stakingPeriodOf(address _stakeholder, StakingPeriod _stakePeriod) public view returns (StakingPeriod) {
-        return stakes[_stakeholder][_stakePeriod].stakePeriod;
-    }
-
-    function getDailyRewards(StakingPeriod _stakePeriod) public view returns (uint256) {
-        stake memory tempStake = stakes[msg.sender][_stakePeriod];
+    function getDailyRewards(address _token) public view returns (uint256) {
+        stake memory tempStake = stakes[msg.sender][_token];
         uint256 total_rewards = getInvestorRewards(tempStake.amount, tempStake);
         uint256 noOfDays = (block.timestamp - tempStake.timestamp).div(60).div(60).div(24);
         noOfDays = (noOfDays < 1) ? 1 : noOfDays;
@@ -566,21 +571,4 @@ contract Staking is Ownable {
             stakeholders.pop();
         } 
     }
-    // ---------- REWARDS ----------
-
-    
-    function getTotalRewards()
-        public
-        view
-        returns(uint256)
-    {
-        return totalRewards;
-    }
-
-    // ---- Staking APY  setters ---- 
-
-    function setAPR(uint8 _apr) public onlyOwner {
-        APR = _apr;
-    }
-
 }
