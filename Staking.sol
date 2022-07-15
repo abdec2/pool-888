@@ -4019,21 +4019,38 @@ abstract contract Ownable is Context {
 }
 
 
+pragma solidity ^0.8.0;
+
+interface UniswapV3Twap {
+   function estimateAmountOut(
+        address tokenIn,
+        uint128 amountIn,
+        uint32 secondsAgo
+    ) external view returns (uint amountOut);
+}
+
+
+
 
 pragma solidity ^0.8.0;
 
 contract Staking is Ownable {
     using SafeMath for uint256;
 
+    UniswapV3Twap Oracle = UniswapV3Twap(address(0xB8740cEe7A66D396ad24E451108060070f9B778b));
+
     TripleEight public rewardToken;
+
+    uint8 public liquidityPoolWeight = 2;
 
     struct token {
         address tokenAddress;
         string tokenName;
         string tokenSymbol;
-        uint256 depositFee;
+        uint8 depositFeePercentage;
+        uint8 withdrawlFeePercentage;
         uint256 harvestLockup;
-        uint256 apr;
+        uint8 weight;
     }
 
     struct stake {
@@ -4049,23 +4066,77 @@ contract Staking is Ownable {
     mapping(address => mapping(address => stake)) public stakes; 
     // mapping total stake per token
     mapping(address => uint256) public totalStaked;
-
     mapping(address => uint256) public rewardsPaid;
+
 
     constructor(address _rewardToken)
     { 
         rewardToken = TripleEight(_rewardToken);
     }
 
+    function getTokenPrice(uint128 amount) public view returns (uint256) {
+        return Oracle.estimateAmountOut(address(rewardToken), amount, 10);
+    }
+
+    function getTotalStakingPoolWeight() internal view returns(uint256) {
+        uint256 totalWeight = 0;
+        for (
+            uint256 allowedTokensIndex = 0;
+            allowedTokensIndex < allowedTokens.length;
+            allowedTokensIndex++
+        ) {
+            totalWeight += allowedTokens[allowedTokensIndex].weight;
+        }
+        return totalWeight;
+    }
+
+    function getStakingTokenPoolWeight(address _token) internal view returns (uint256) {
+        for (
+            uint256 allowedTokensIndex = 0;
+            allowedTokensIndex < allowedTokens.length;
+            allowedTokensIndex++
+        ) {
+            if (allowedTokens[allowedTokensIndex].tokenAddress == _token) {
+                return allowedTokens[allowedTokensIndex].weight;
+            }
+        }
+        return 1;
+    }
+
+    function getTotalStakedTokens() internal view returns(uint256) {
+        uint256 totalStakedTokens = 0;
+        for(uint i = 0; i < allowedTokens.length; i++)
+        {
+            totalStakedTokens += totalStaked[allowedTokens[i].tokenAddress];
+        }
+        return totalStakedTokens;
+    }
+
+    function getApr(address _token) public view returns(uint256) {
+        uint256 rewardTokenApprovedSupply = rewardToken.ApprovedSupply();
+        uint256 availableForEmission = rewardTokenApprovedSupply.mul(20).div(100);
+        uint256 oneDayEmission = availableForEmission.div(365);
+        uint256 totalWeight = getTotalStakingPoolWeight() + liquidityPoolWeight;
+        uint256 weight = getTokenStruct(_token).weight;
+        uint256 poolEmission = weight.div(totalWeight).mul(oneDayEmission);
+        uint256 rewardTokenValue = getTokenPrice(100000000).div(10 ** 6);
+        uint256 poolEmissionDailyValue = rewardTokenValue.mul(poolEmission);
+        uint256 tlv = getTotalStakedTokens();
+        uint256 apy = poolEmissionDailyValue.mul(365).mul(100).div(tlv);
+
+        return apy;
+    }
+
     function addAllowedTokens(
         address _tokenAddress, 
         string memory _name,
         string memory _symbol, 
-        uint256 _depositFee, 
-        uint256 _harvestLockup, 
-        uint256 _apr
+        uint8 _depositFeePercentage, 
+        uint8 _withdrawlFeePercentage, 
+        uint256 _harvestLockup,
+        uint8 _weight
     ) public onlyOwner {
-        token memory _token = token(_tokenAddress, _name, _symbol, _depositFee, _harvestLockup, _apr);
+        token memory _token = token(_tokenAddress, _name, _symbol, _depositFeePercentage, _withdrawlFeePercentage, _harvestLockup, _weight);
         allowedTokens.push(_token);
     }
 
@@ -4099,18 +4170,24 @@ contract Staking is Ownable {
     function createStake(uint256 _amount, address _token) public {
         require(_amount > 0, "stake value should not be zero");
         require(tokenIsAllowed(_token), "Token currently isn't allowed");
-        require(IERC20(_token).transferFrom(msg.sender, address(this), _amount), "Token Transfer Failed");
+
+        token memory tokenObj = getTokenStruct(_token);
+
+        uint256 depositFee = _amount.mul(tokenObj.depositFeePercentage).div(100);
+        uint256 stakeAmount = _amount.sub(depositFee);
+
+        require(IERC20(_token).transferFrom(msg.sender, owner(), depositFee), "Deposit Fee: Token Transfer Failed");
+        require(IERC20(_token).transferFrom(msg.sender, address(this), stakeAmount), " Stake Amount: Token Transfer Failed");
 
         if(stakes[msg.sender][_token].amount == 0) {
             addStakeholder(msg.sender);
-            token memory tokenObj = getTokenStruct(_token);
-            stakes[msg.sender][_token] = stake(_amount, tokenObj, block.timestamp);
-            totalStaked[_token] = totalStaked[_token].add(_amount);
+            stakes[msg.sender][_token] = stake(stakeAmount, tokenObj, block.timestamp);
+            totalStaked[_token] = totalStaked[_token].add(stakeAmount);
         } else {
             stake memory tempStake = stakes[msg.sender][_token];
-            tempStake.amount = tempStake.amount.add(_amount);
+            tempStake.amount = tempStake.amount.add(stakeAmount);
             stakes[msg.sender][_token] = tempStake;
-            totalStaked[_token] = totalStaked[_token].add(_amount);
+            totalStaked[_token] = totalStaked[_token].add(stakeAmount);
         }
     }
 
@@ -4128,16 +4205,21 @@ contract Staking is Ownable {
     function getRewards(address _token) public {
         uint256 rewardtime = stakes[msg.sender][_token].timestamp + (stakes[msg.sender][_token].stakeToken.harvestLockup * 3600);
         require(block.timestamp >= rewardtime, "harvest not allowed");
+        uint256 apy = getApr(_token);
         
-        uint256 userReward = stakes[msg.sender][_token].amount.mul(stakes[msg.sender][_token].stakeToken.apr).div(100);
+        uint256 userReward = stakes[msg.sender][_token].amount.mul(apy).div(100);
         uint256 rewardToBePaid = userReward.div(365).div(24).div(60).mul(block.timestamp.sub(stakes[msg.sender][_token].timestamp).div(60));
         stakes[msg.sender][_token].timestamp = block.timestamp;
         rewardsPaid[msg.sender] = rewardsPaid[msg.sender].add(rewardToBePaid);
-        rewardToken.mint(msg.sender, rewardToBePaid);
+        uint256 withdrawlFee = rewardToBePaid.mul(stakes[msg.sender][_token].stakeToken.withdrawlFeePercentage).div(100);
+        uint256 netRewardsToBePaid = rewardToBePaid.sub(withdrawlFee);
+        rewardToken.mint(msg.sender, netRewardsToBePaid);
+        rewardToken.mint(owner(), withdrawlFee);
     }
 
     function getRewardsPerMinute(address _token) public view returns(uint256) {
-        uint256 AnnualReward = stakes[msg.sender][_token].amount.mul(stakes[msg.sender][_token].stakeToken.apr).div(100);
+        uint256 apy = getApr(_token);
+        uint256 AnnualReward = stakes[msg.sender][_token].amount.mul(apy).div(100);
         return AnnualReward.div(365).div(24).div(60).mul(block.timestamp.sub(stakes[msg.sender][_token].timestamp).div(60));
     }
 
@@ -4181,3 +4263,5 @@ contract Staking is Ownable {
         } 
     }
 }
+
+// https://rinkeby.etherscan.io/address/0x66eed5c3920d85abbb9c8fb8da09e807866357d2
