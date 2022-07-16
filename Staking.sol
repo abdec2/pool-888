@@ -4029,14 +4029,12 @@ interface UniswapV3Twap {
     ) external view returns (uint amountOut);
 }
 
-
-
-
 pragma solidity ^0.8.0;
 
 contract Staking is Ownable {
     using SafeMath for uint256;
 
+    // 0xB8740cEe7A66D396ad24E451108060070f9B778b
     UniswapV3Twap Oracle = UniswapV3Twap(address(0xB8740cEe7A66D396ad24E451108060070f9B778b));
 
     TripleEight public rewardToken;
@@ -4072,6 +4070,14 @@ contract Staking is Ownable {
     constructor(address _rewardToken)
     { 
         rewardToken = TripleEight(_rewardToken);
+        token memory _token = token(address(0x0f762a37718d4BeaD84f4ae66e00A56885Fe5507), "USDC", "USDC", 5, 2, 8, 3);
+        token memory _token1 = token(address(0xECff50c25543af32BADeaB542D0805b8B911cD4d), "USDT", "USDT", 5, 2, 8, 2);
+        token memory _token2 = token(address(0x9ff305836Feb02996d3baC69DB1394dAbd71481F), "WETH", "WETH", 5, 2, 8, 1);
+        token memory _token3 = token(address(0xC1526b5D8E74BC9583562Bc3AF3631c284C8E41d), "WMATIC", "WMATIC", 5, 2, 8, 1);
+        allowedTokens.push(_token);
+        allowedTokens.push(_token1);
+        allowedTokens.push(_token2);
+        allowedTokens.push(_token3);
     }
 
     function getTokenPrice(uint128 amount) public view returns (uint256) {
@@ -4114,14 +4120,14 @@ contract Staking is Ownable {
 
     function getApr(address _token) public view returns(uint256) {
         uint256 rewardTokenApprovedSupply = rewardToken.ApprovedSupply();
-        uint256 availableForEmission = rewardTokenApprovedSupply.mul(20).div(100);
+        uint256 availableForEmission = rewardTokenApprovedSupply.sub(rewardTokenApprovedSupply.mul(20).div(100));
         uint256 oneDayEmission = availableForEmission.div(365);
         uint256 totalWeight = getTotalStakingPoolWeight() + liquidityPoolWeight;
         uint256 weight = getTokenStruct(_token).weight;
-        uint256 poolEmission = weight.div(totalWeight).mul(oneDayEmission);
+        uint256 poolEmission = weight.mul(oneDayEmission).div(totalWeight);
         uint256 rewardTokenValue = getTokenPrice(100000000).div(10 ** 6);
-        uint256 poolEmissionDailyValue = rewardTokenValue.mul(poolEmission);
-        uint256 tlv = getTotalStakedTokens();
+        uint256 poolEmissionDailyValue = rewardTokenValue.mul(poolEmission).div(10 ** 8);
+        uint256 tlv = getTotalStakedTokens().div(10 ** 6);
         uint256 apy = poolEmissionDailyValue.mul(365).mul(100).div(tlv);
 
         return apy;
