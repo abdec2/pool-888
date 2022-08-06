@@ -3632,11 +3632,6 @@ pragma solidity ^0.8.4;
 
 
 
-
-
-
-
-
 contract TripleEight is ERC20, ERC20Burnable, ERC20Snapshot, AccessControl, Pausable, ERC20Permit, ERC20Votes {
     bytes32 public constant SNAPSHOT_ROLE = keccak256("SNAPSHOT_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");

@@ -4018,7 +4018,6 @@ abstract contract Ownable is Context {
     }
 }
 
-
 pragma solidity ^0.8.0;
 
 interface UniswapV3Twap {
@@ -4127,7 +4126,8 @@ contract Staking is Ownable {
         uint256 poolEmission = weight.mul(oneDayEmission).div(totalWeight);
         uint256 rewardTokenValue = getTokenPrice(100000000).div(10 ** 6);
         uint256 poolEmissionDailyValue = rewardTokenValue.mul(poolEmission).div(10 ** 8);
-        uint256 tlv = getTotalStakedTokens().div(10 ** 6);
+        uint256 totalStakedToken = getTotalStakedTokens();
+        uint256 tlv = totalStakedToken > 0 ? totalStakedToken.div(10 ** 6) : 10 ** 6;
         uint256 apy = poolEmissionDailyValue.mul(365).mul(100).div(tlv);
 
         return apy;
@@ -4206,6 +4206,11 @@ contract Staking is Ownable {
         if(stakes[msg.sender][_token].amount == 0) removeStakeholder(msg.sender);
         IERC20(_token).transfer(msg.sender, _amount);   
         totalStaked[_token] = totalStaked[_token].sub(_amount);     
+    }
+
+    function harvestOpen(address _token) public view returns (bool) {
+        uint256 rewardtime = stakes[msg.sender][_token].timestamp + (stakes[msg.sender][_token].stakeToken.harvestLockup * 3600);
+        return block.timestamp >= rewardtime;
     }
 
     function getRewards(address _token) public {
