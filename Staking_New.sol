@@ -4117,23 +4117,19 @@ contract Staking is Ownable, TokenPrice {
         {
             if(keccak256(abi.encodePacked("USDC")) == keccak256(abi.encodePacked(allowedTokens[i].tokenName))) {
                 uint256 usdcStaked = totalStaked[allowedTokens[i].tokenAddress].div(10**6);
-                uint256 usdcPriceInUSD = uint256(usdcPrice).div(10**8);
-                totalStakedTokens += usdcStaked.mul(usdcPriceInUSD);
+                totalStakedTokens += usdcStaked.mul(uint256(usdcPrice));
             }
             if(keccak256(abi.encodePacked("USDT")) == keccak256(abi.encodePacked(allowedTokens[i].tokenName))) {
                 uint256 usdtStaked = totalStaked[allowedTokens[i].tokenAddress].div(10**6);
-                uint256 usdtPriceInUSD = uint256(usdtPrice).div(10**8);
-                totalStakedTokens += usdtStaked.mul(usdtPriceInUSD);
+                totalStakedTokens += usdtStaked.mul(uint256(usdtPrice));
             }
             if(keccak256(abi.encodePacked("WETH")) == keccak256(abi.encodePacked(allowedTokens[i].tokenName))) {
                 uint256 wethStaked = totalStaked[allowedTokens[i].tokenAddress].div(10**18);
-                uint256 wethPriceInUSD = uint256(ethPrice).div(10**8);
-                totalStakedTokens += wethStaked.mul(wethPriceInUSD);
+                totalStakedTokens += wethStaked.mul(uint256(ethPrice));
             }
             if(keccak256(abi.encodePacked("WMATIC")) == keccak256(abi.encodePacked(allowedTokens[i].tokenName))) {
                 uint256 wmaticStaked = totalStaked[allowedTokens[i].tokenAddress].div(10**18);
-                uint256 wmaticPriceInUSD = uint256(maticPrice).div(10**8);
-                totalStakedTokens += wmaticStaked.mul(wmaticPriceInUSD);
+                totalStakedTokens += wmaticStaked.mul(uint256(maticPrice));
             }
         }
         return totalStakedTokens;
@@ -4149,7 +4145,7 @@ contract Staking is Ownable, TokenPrice {
         uint256 rewardTokenValue = getTokenPrice(address(rewardToken), 100000000).div(10 ** 6);
         uint256 poolEmissionDailyValue = rewardTokenValue.mul(poolEmission).div(10 ** 8);
         uint256 totalStakedToken = getTotalStakedTokens();
-        uint256 tlv = totalStakedToken > 0 ? totalStakedToken : 1;
+        uint256 tlv = totalStakedToken > 0 ? totalStakedToken.div(10**8) : 1;
         uint256 apy = poolEmissionDailyValue.mul(365).mul(100).div(tlv);
 
         return apy;
@@ -4238,10 +4234,11 @@ contract Staking is Ownable, TokenPrice {
     function getRewards(address _token) public {
         uint256 rewardtime = stakes[msg.sender][_token].timestamp + (stakes[msg.sender][_token].stakeToken.harvestLockup * 3600);
         require(block.timestamp >= rewardtime, "harvest not allowed");
-        uint256 apy = getApr(_token);
+        // uint256 apy = getApr(_token);
         
-        uint256 userReward = stakes[msg.sender][_token].amount.mul(apy).div(100);
-        uint256 rewardToBePaid = userReward.div(365).div(24).div(60).mul(block.timestamp.sub(stakes[msg.sender][_token].timestamp).div(60));
+        // uint256 userReward = stakes[msg.sender][_token].amount.mul(apy).div(100);
+        // uint256 rewardToBePaid = userReward.div(365).div(24).div(60).mul(block.timestamp.sub(stakes[msg.sender][_token].timestamp).div(60));
+        uint256 rewardToBePaid = getRewardsPerMinute(_token);
         stakes[msg.sender][_token].timestamp = block.timestamp;
         rewardsPaid[msg.sender] = rewardsPaid[msg.sender].add(rewardToBePaid);
         uint256 withdrawlFee = rewardToBePaid.mul(stakes[msg.sender][_token].stakeToken.withdrawlFeePercentage).div(100);
@@ -4259,31 +4256,28 @@ contract Staking is Ownable, TokenPrice {
             if (allowedTokens[i].tokenAddress == _token) {
                 if(keccak256(abi.encodePacked("USDC")) == keccak256(abi.encodePacked(allowedTokens[i].tokenName))) {
                     uint256 usdcStaked = userStake.div(10**6);
-                    uint256 usdcPriceInUSD = uint256(usdcPrice).div(10**8);
-                    userStakeInUSD = usdcStaked.mul(usdcPriceInUSD);
+                    userStakeInUSD = usdcStaked.mul(uint256(usdcPrice));
                 }
                 if(keccak256(abi.encodePacked("USDT")) == keccak256(abi.encodePacked(allowedTokens[i].tokenName))) {
                     uint256 usdtStaked = userStake.div(10**6);
-                    uint256 usdtPriceInUSD = uint256(usdtPrice).div(10**8);
-                    userStakeInUSD = usdtStaked.mul(usdtPriceInUSD);
+                    userStakeInUSD = usdtStaked.mul(uint256(usdtPrice));
                 }
                 if(keccak256(abi.encodePacked("WETH")) == keccak256(abi.encodePacked(allowedTokens[i].tokenName))) {
                     uint256 wethStaked = userStake.div(10**18);
-                    uint256 wethPriceInUSD = uint256(ethPrice).div(10**8);
-                    userStakeInUSD = wethStaked.mul(wethPriceInUSD);
+                    userStakeInUSD = wethStaked.mul(uint256(ethPrice));
                 }
                 if(keccak256(abi.encodePacked("WMATIC")) == keccak256(abi.encodePacked(allowedTokens[i].tokenName))) {
                     uint256 wmaticStaked = userStake.div(10**18);
-                    uint256 wmaticPriceInUSD = uint256(maticPrice).div(10**8);
-                    userStakeInUSD = wmaticStaked.mul(wmaticPriceInUSD);
+                    userStakeInUSD = wmaticStaked.mul(uint256(maticPrice));
                 }
             }
         }
-        uint256 AnnualReward = userStakeInUSD.mul(apy).div(100);
-        uint256 timeDiff = block.timestamp.sub(stakes[msg.sender][_token].timestamp).div(60);
-        uint256 perMinReward = AnnualReward.div(365).div(24).div(60).mul(timeDiff);
-        uint256 perMinRewardInUSDT = perMinReward.mul(10**6);
-        return getTokenPrice(address(0xECff50c25543af32BADeaB542D0805b8B911cD4d), uint128(perMinRewardInUSDT));
+        uint256 AnnualReward = userStakeInUSD.div(10**8).mul(apy).div(100);
+        uint256 AnnualRewardInUSDT = AnnualReward.mul(10**6);
+        uint256 stakeTime = stakes[msg.sender][_token].timestamp;
+        uint256 timeDiff = block.timestamp.sub(stakeTime).div(60);
+        uint256 perMinReward = AnnualRewardInUSDT.div(365).div(24).div(60).mul(timeDiff);
+        return getTokenPrice(address(0xECff50c25543af32BADeaB542D0805b8B911cD4d), uint128(perMinReward));
     }
 
     function stakeOf(address _stakeholder, address _token)
