@@ -4035,8 +4035,8 @@ import "./TokenPrice.sol";
 contract Staking is Ownable, TokenPrice {
     using SafeMath for uint256;
 
-    // 0xB8740cEe7A66D396ad24E451108060070f9B778b
-    UniswapV3Twap Oracle = UniswapV3Twap(address(0xB8740cEe7A66D396ad24E451108060070f9B778b));
+    // 0x2fe4902233EaFB3706fF05533da45BCDe238c1E7 testnet polygon
+    UniswapV3Twap Oracle = UniswapV3Twap(address(0x2fe4902233EaFB3706fF05533da45BCDe238c1E7));
 
     TripleEight public rewardToken;
 
@@ -4071,10 +4071,10 @@ contract Staking is Ownable, TokenPrice {
     constructor(address _rewardToken)
     { 
         rewardToken = TripleEight(_rewardToken);
-        token memory _token = token(address(0x0f762a37718d4BeaD84f4ae66e00A56885Fe5507), "USDC", "USDC", 5, 2, 8, 3);
-        token memory _token1 = token(address(0xECff50c25543af32BADeaB542D0805b8B911cD4d), "USDT", "USDT", 5, 2, 8, 2);
-        token memory _token2 = token(address(0x9ff305836Feb02996d3baC69DB1394dAbd71481F), "WETH", "WETH", 5, 2, 8, 1);
-        token memory _token3 = token(address(0xC1526b5D8E74BC9583562Bc3AF3631c284C8E41d), "WMATIC", "WMATIC", 5, 2, 8, 1);
+        token memory _token = token(address(0xAE90A6e8470eCbB888b37Ec68E982D7507d7D3c8), "USDC", "USDC", 5, 2, 8, 3);
+        token memory _token1 = token(address(0x0950D64525706842a16c5BD73c14F38fBd610c9B), "USDT", "USDT", 5, 2, 8, 2);
+        token memory _token2 = token(address(0xB10AB37b7220e267a903b193212278266Ff7CC10), "WETH", "WETH", 5, 2, 8, 1);
+        token memory _token3 = token(address(0x62446C95F971D62FD66998688e4C58475C9943C5), "WMATIC", "WMATIC", 5, 2, 8, 1);
         allowedTokens.push(_token);
         allowedTokens.push(_token1);
         allowedTokens.push(_token2);

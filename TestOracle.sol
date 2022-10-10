@@ -8,6 +8,6 @@ contract UniswapV3Twap {
         uint128 amountIn,
         uint32 secondsAgo
     ) external view returns (uint amountOut) {
-        return 45454369172;
+        return 47000000000;
     }
 }

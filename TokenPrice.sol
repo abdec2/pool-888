@@ -11,16 +11,16 @@ contract TokenPrice {
 
     constructor() {
         priceFeedUSDT = AggregatorV3Interface(
-            0xa24de01df22b63d23Ebc1882a5E3d4ec0d907bFB
+            0x92C09849638959196E976289418e5973CC96d645
         );
         priceFeedUSDC = AggregatorV3Interface(
-            0xa24de01df22b63d23Ebc1882a5E3d4ec0d907bFB
+            0x572dDec9087154dC5dfBB1546Bb62713147e0Ab0
         );
         priceFeedETH = AggregatorV3Interface(
-            0x8A753747A1Fa494EC906cE90E9f37563A8AF630e
+            0x0715A7794a1dc8e42615F059dD6e406A6594651A
         );
         priceFeedMATIC = AggregatorV3Interface(
-            0x7794ee502922e2b723432DDD852B3C30A911F021
+            0xd0D5e3DB44DE05E9F294BB0a3bEEaF030DE24Ada
         );
     }
 
